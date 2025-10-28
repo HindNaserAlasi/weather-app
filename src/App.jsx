@@ -13,7 +13,6 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
   const [error, setError] = useState("");
-const apiKey = import.meta.env.VITE_WEATHER_API_KEY;
 
   // Simple sessionStorage cache to avoid repeated requests
   const cacheKey = (city) => `weather_cache_${city.toLowerCase()}`;
@@ -39,17 +38,9 @@ const apiKey = import.meta.env.VITE_WEATHER_API_KEY;
         }
       }
 
-      if (!apiKey) {
-        setError("API key missing. Put VITE_WEATHER_API_KEY in .env");
-        setWeather(null);
-        setLoading(false);
-        return;
-      }
-
+      // طلب البيانات من Netlify Function بدل الـ API مباشرة
       const res = await fetch(
-        `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(
-          city
-        )}&units=metric&appid=${apiKey}`
+        `/.netlify/functions/weather?city=${encodeURIComponent(city)}`
       );
 
       const data = await res.json();
@@ -80,13 +71,12 @@ const apiKey = import.meta.env.VITE_WEATHER_API_KEY;
     } finally {
       setLoading(false);
     }
-  }, [apiKey]);
+  }, []);
 
   // debounce user search submissions inside SearchBar; here effect loads initial
   useEffect(() => {
     fetchWeather(search);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSearch = (city) => {
     setSearch(city);
@@ -95,7 +85,6 @@ const apiKey = import.meta.env.VITE_WEATHER_API_KEY;
 
   const toggleDarkMode = () => {
     setDarkMode((d) => !d);
-    // optional: persist UI preference
     if (!darkMode) {
       document.documentElement.classList.add("dark");
     } else {
