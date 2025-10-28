@@ -1,0 +1,25 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Custom small helpers */
+:root {
+  --glass-bg: rgba(255,255,255,0.45);
+  --glass-bg-dark: rgba(17,24,39,0.45);
+}
+
+/* base body */
+body {
+  @apply bg-gradient-to-br from-indigo-50 to-blue-100 dark:from-gray-900 dark:to-gray-800 text-gray-800 dark:text-gray-100;
+  font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* a subtle container card style */
+.card {
+  background: var(--glass-bg);
+}
+.dark .card {
+  background: var(--glass-bg-dark);
+}
