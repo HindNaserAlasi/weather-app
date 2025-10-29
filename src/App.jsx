@@ -13,16 +13,23 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [darkMode, setDarkMode] = useState(false);
   const [error, setError] = useState("");
+  const [controller, setController] = useState(null); // للتحكم في الطلبات المتداخلة
 
   const cacheKey = (city) => `weather_cache_${city.toLowerCase()}`;
 
   const fetchWeather = useCallback(async (city) => {
-    if (!city) return;
+    if (!city.trim()) return;
+
     setError("");
     setLoading(true);
 
+    // إلغاء أي طلب سابق قيد التنفيذ
+    if (controller) controller.abort();
+    const newController = new AbortController();
+    setController(newController);
+
     try {
-      // cache check
+      // التحقق من الكاش
       const cached = sessionStorage.getItem(cacheKey(city));
       if (cached) {
         const parsed = JSON.parse(cached);
@@ -36,41 +43,43 @@ export default function App() {
         }
       }
 
-      // Fetch via Netlify Function
-      const res = await fetch(`/.netlify/functions/weather?city=${encodeURIComponent(city)}`);
+      // الطلب من دالة Netlify Function
+      const res = await fetch(
+        `/.netlify/functions/weather?city=${encodeURIComponent(city)}`,
+        { signal: newController.signal }
+      );
+
+      if (!res.ok) throw new Error("API error");
       const data = await res.json();
 
-      if (!res.ok || data.cod !== 200) {
-        setError(data.message || "City not found!");
-        setWeather(null);
-      } else {
-        const cleaned = {
-          city: data.name,
-          temp: Math.round(data.main.temp),
-          humidity: data.main.humidity,
-          wind: data.wind.speed,
-          description: data.weather[0].description,
-          icon: `https://openweathermap.org/img/wn/${data.weather[0].icon}@2x.png`
-        };
-        setWeather(cleaned);
-        sessionStorage.setItem(
-          cacheKey(city),
-          JSON.stringify({ _ts: Date.now(), data: cleaned })
-        );
-      }
+      const cleaned = {
+        city: data.name,
+        temp: Math.round(data.main.temp),
+        humidity: data.main.humidity,
+        wind: data.wind.speed,
+        description: data.weather[0].description,
+        icon: `https://openweathermap.org/img/wn/${data.weather[0].icon}@2x.png`,
+      };
+
+      setWeather(cleaned);
+      sessionStorage.setItem(
+        cacheKey(city),
+        JSON.stringify({ _ts: Date.now(), data: cleaned })
+      );
     } catch (err) {
-      console.error(err);
-      setError("Error fetching weather");
-      setWeather(null);
+      if (err.name !== "AbortError") {
+        console.error(err);
+        setError("City not found or API error");
+        setWeather(null);
+      }
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [controller]);
 
-  // Load default city
   useEffect(() => {
     fetchWeather(search);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []); // تحميل أول مدينة
 
   const handleSearch = (city) => {
     setSearch(city);
@@ -79,7 +88,11 @@ export default function App() {
 
   const toggleDarkMode = () => {
     setDarkMode((d) => !d);
-    document.documentElement.classList.toggle("dark", !darkMode);
+    if (!darkMode) {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
   };
 
   return (
@@ -99,14 +112,14 @@ export default function App() {
             {loading && <Loader />}
 
             {!loading && error && (
-              <div className="mt-6 bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-700 text-yellow-700 dark:text-yellow-200 p-4 rounded text-center">
-                ⚠️ {error}
+              <div className="mt-6 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 text-red-700 dark:text-red-200 p-4 rounded">
+                {error}
               </div>
             )}
 
-            {!loading && weather && !error && (
+            {!loading && weather && (
               <Suspense fallback={<Loader />}>
-                <div className="flex justify-center mt-6">
+                <div className="flex justify-center">
                   <WeatherCard {...weather} />
                 </div>
               </Suspense>
