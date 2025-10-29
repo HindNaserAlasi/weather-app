@@ -14,7 +14,6 @@ export default function App() {
   const [darkMode, setDarkMode] = useState(false);
   const [error, setError] = useState("");
 
-  // Simple sessionStorage cache to avoid repeated requests
   const cacheKey = (city) => `weather_cache_${city.toLowerCase()}`;
 
   const fetchWeather = useCallback(async (city) => {
@@ -23,12 +22,11 @@ export default function App() {
     setLoading(true);
 
     try {
-      // check cache
+      // cache check
       const cached = sessionStorage.getItem(cacheKey(city));
       if (cached) {
         const parsed = JSON.parse(cached);
         const age = Date.now() - parsed._ts;
-        // use cache for 10 minutes
         if (age < 10 * 60 * 1000) {
           setWeather(parsed.data);
           setLoading(false);
@@ -38,14 +36,11 @@ export default function App() {
         }
       }
 
-      // طلب البيانات من Netlify Function بدل الـ API مباشرة
-      const res = await fetch(
-        `/.netlify/functions/weather?city=${encodeURIComponent(city)}`
-      );
-
+      // Fetch via Netlify Function
+      const res = await fetch(`/.netlify/functions/weather?city=${encodeURIComponent(city)}`);
       const data = await res.json();
 
-      if (res.status !== 200) {
+      if (!res.ok || data.cod !== 200) {
         setError(data.message || "City not found!");
         setWeather(null);
       } else {
@@ -58,7 +53,6 @@ export default function App() {
           icon: `https://openweathermap.org/img/wn/${data.weather[0].icon}@2x.png`
         };
         setWeather(cleaned);
-        // cache
         sessionStorage.setItem(
           cacheKey(city),
           JSON.stringify({ _ts: Date.now(), data: cleaned })
@@ -73,7 +67,7 @@ export default function App() {
     }
   }, []);
 
-  // debounce user search submissions inside SearchBar; here effect loads initial
+  // Load default city
   useEffect(() => {
     fetchWeather(search);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -85,11 +79,7 @@ export default function App() {
 
   const toggleDarkMode = () => {
     setDarkMode((d) => !d);
-    if (!darkMode) {
-      document.documentElement.classList.add("dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-    }
+    document.documentElement.classList.toggle("dark", !darkMode);
   };
 
   return (
@@ -109,14 +99,14 @@ export default function App() {
             {loading && <Loader />}
 
             {!loading && error && (
-              <div className="mt-6 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700 text-red-700 dark:text-red-200 p-4 rounded">
-                {error}
+              <div className="mt-6 bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-700 text-yellow-700 dark:text-yellow-200 p-4 rounded text-center">
+                ⚠️ {error}
               </div>
             )}
 
-            {!loading && weather && (
+            {!loading && weather && !error && (
               <Suspense fallback={<Loader />}>
-                <div className="flex justify-center">
+                <div className="flex justify-center mt-6">
                   <WeatherCard {...weather} />
                 </div>
               </Suspense>
